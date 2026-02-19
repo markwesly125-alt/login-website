@@ -7,12 +7,15 @@ from werkzeug.utils import secure_filename
 from flask import send_from_directory
 
 
+#define base directory and environment variables
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-default-secret-key") #fallback in case env variable is not set
 
 
 from flask import Flask
 app = Flask(__name__)
-app.secret_key = "super-secret-key"
+app.secret_key = SECRET_KEY
 
 import os
 from flask import Flask
