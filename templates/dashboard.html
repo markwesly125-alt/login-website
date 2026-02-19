@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav>
+    Welcome {{ session["user"] }}
+    <a href="/dashboard">Dashboard</a>
+
+    {% if session["role"] == "admin" %}
+        <a href="/admin/users">Manage Users</a>
+    {% endif %}
+
+    <a href="/logout">Logout</a>
+</nav>
+
+<div class="container">
+    <h2>Dashboard</h2>
+    <p>You are successfully logged in.</p>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
