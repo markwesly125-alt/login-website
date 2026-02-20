@@ -1,46 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manage Users</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Admin – User Management</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .btn {
+            padding: 6px 10px;
+            text-decoration: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+        }
+        .approve { background: #28a745; }
+        .promote { background: #007bff; }
+        .disabled { color: #777; }
+    </style>
 </head>
 <body>
 
-<nav>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/logout">Logout</a>
-</nav>
+<h2>Admin – User Management</h2>
 
-<div class="container">
-    <h2>Manage Users</h2>
+<table>
+    <tr>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
 
-    <table border="1" cellpadding="10">
-        <tr>
-            <th>ID</th>
-            <th>Username</th>
-            <th>Role</th>
-            <th>Actions</th>
-        </tr>
+    {% for user in users %}
+    <tr>
+        <td>{{ user.username }}</td>
+        <td>{{ user.role }}</td>
+        <td>{{ "Approved" if user.approved else "Pending" }}</td>
+        <td>
+            {% if not user.approved %}
+                <a class="btn approve" href="/admin/approve/{{ user.id }}">Approve</a>
+            {% elif user.role != "admin" %}
+                <a class="btn promote" href="/admin/promote/{{ user.id }}">Promote to Admin</a>
+            {% else %}
+                <span class="disabled">Admin</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
 
-        {% for user in users %}
-        <tr>
-            <td>{{ user.id }}</td>
-            <td>{{ user.username }}</td>
-            <td>{{ user.role }}</td>
-            <td>
-                {% if user.role != "admin" %}
-                    <a href="/admin/promote/{{ user.id }}">Promote to Admin</a>
-                {% elif user.username != session['user'] %}
-                    <a href="/admin/demote/{{ user.id }}">Demote to User</a>
-                {% else %}
-                    (You)
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-</div>
-
-<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

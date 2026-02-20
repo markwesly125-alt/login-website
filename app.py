@@ -12,29 +12,24 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-fallback-key")
 
-# -------------------------------------------------
-# DATABASE CONFIG
-# -------------------------------------------------
+# DATABASE
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable not set")
 
-# Fix old postgres:// URLs
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-db = SQLAlchemy(app)
-
-# -------------------------------------------------
-# UPLOAD CONFIG
-# -------------------------------------------------
+# UPLOADS
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "zip"}
+
+db = SQLAlchemy(app)
 
 # -------------------------------------------------
 # MODELS
@@ -93,6 +88,7 @@ def login():
         password = request.form["password"]
 
         user = User.query.filter_by(username=username).first()
+
         if not user or not check_password_hash(user.password, password):
             return "Invalid credentials", 401
 
@@ -102,6 +98,7 @@ def login():
         session.clear()
         session["user"] = user.username
         session["role"] = user.role
+
         return redirect("/dashboard")
 
     return render_template("index.html")
@@ -110,14 +107,13 @@ def login():
 def register():
     if request.method == "POST":
         username = request.form["username"].strip()
-        password = request.form["password"]
 
         if User.query.filter_by(username=username).first():
             return "User already exists", 400
 
         user = User(
             username=username,
-            password=generate_password_hash(password),
+            password=generate_password_hash(request.form["password"]),
             role="user",
             approved=False
         )
@@ -138,11 +134,12 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ---------------- ADMIN ----------------
+# ----------------- ADMIN ROUTES -----------------
 @app.route("/admin/users")
 def manage_users():
     if session.get("role") != "admin":
         return "Access denied", 403
+
     users = User.query.all()
     return render_template("users.html", users=users)
 
@@ -150,8 +147,23 @@ def manage_users():
 def approve_user(user_id):
     if session.get("role") != "admin":
         return "Access denied", 403
+
     user = User.query.get_or_404(user_id)
     user.approved = True
+    db.session.commit()
+    return redirect("/admin/users")
+
+@app.route("/admin/promote/<int:user_id>")
+def promote_user(user_id):
+    if session.get("role") != "admin":
+        return "Access denied", 403
+
+    user = User.query.get_or_404(user_id)
+
+    if not user.approved:
+        return "User must be approved first", 400
+
+    user.role = "admin"
     db.session.commit()
     return redirect("/admin/users")
 
@@ -167,6 +179,7 @@ def upload_project():
 
         if not file or file.filename == "":
             return "No file selected", 400
+
         if not allowed_file(file.filename):
             return "File type not allowed", 400
 
@@ -179,6 +192,7 @@ def upload_project():
             filename=filename,
             uploaded_by=session["user"]
         )
+
         db.session.add(project)
         db.session.commit()
         return redirect("/dashboard")
@@ -190,13 +204,10 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 # -------------------------------------------------
-# BOOTSTRAP (SAFE FOR RENDER + GUNICORN)
+# STARTUP
 # -------------------------------------------------
-with app.app_context():
-    db.create_all()
-    create_default_admin()
-
-# DO NOT CALL app.run() IN PRODUCTION
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    with app.app_context():
+        db.create_all()
+        create_default_admin()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
