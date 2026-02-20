@@ -13,8 +13,7 @@ from werkzeug.utils import secure_filename
 # =========================
 # BASE CONFIG
 # =========================
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+UPLOAD_FOLDER = "/tmp/uploads"  # Render writable path
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "zip"}
@@ -28,10 +27,10 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# ---- SQLite FIX FOR RENDER ----
-DB_PATH = os.path.join(BASE_DIR, "users.db")
-open(DB_PATH, "a").close()   # ensure file exists
-
+# -------------------------
+# SQLite RENDER-FRIENDLY PATH
+# -------------------------
+DB_PATH = "/tmp/users.db"
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -177,6 +176,7 @@ def upload_project():
         if not allowed_file(file.filename):
             return "File type not allowed"
 
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
