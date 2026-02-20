@@ -1,5 +1,5 @@
 # =========================
-# IMPORTS (ONCE)
+# IMPORTS
 # =========================
 import os
 from flask import (
@@ -27,7 +27,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "users.db")
+
+# ---- SQLite FIX FOR RENDER ----
+DB_PATH = os.path.join(BASE_DIR, "users.db")
+open(DB_PATH, "a").close()   # ensure file exists
+
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -41,18 +46,21 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), default="user")
 
+
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     filename = db.Column(db.String(300), nullable=False)
     uploaded_by = db.Column(db.String(80), nullable=False)
+    approved = db.Column(db.Boolean, default=False)
 
 # =========================
 # HELPERS
 # =========================
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def create_default_admin():
     admin = User.query.filter_by(username="admin").first()
@@ -83,6 +91,7 @@ def login():
 
     return render_template("index.html")
 
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -100,6 +109,7 @@ def register():
 
     return render_template("register.html")
 
+
 @app.route("/logout")
 def logout():
     session.clear()
@@ -115,7 +125,7 @@ def dashboard():
     return render_template("dashboard.html")
 
 # =========================
-# ADMIN
+# ADMIN — USER MANAGEMENT
 # =========================
 @app.route("/admin/users")
 def manage_users():
@@ -124,6 +134,7 @@ def manage_users():
 
     users = User.query.all()
     return render_template("users.html", users=users)
+
 
 @app.route("/admin/promote/<int:user_id>")
 def promote_user(user_id):
@@ -134,7 +145,9 @@ def promote_user(user_id):
     if user:
         user.role = "admin"
         db.session.commit()
+
     return redirect("/admin/users")
+
 
 @app.route("/admin/demote/<int:user_id>")
 def demote_user(user_id):
@@ -145,10 +158,11 @@ def demote_user(user_id):
     if user and user.username != session.get("user"):
         user.role = "user"
         db.session.commit()
+
     return redirect("/admin/users")
 
 # =========================
-# PROJECT UPLOAD
+# ADMIN — PROJECT UPLOAD
 # =========================
 @app.route("/admin/upload", methods=["GET", "POST"])
 def upload_project():
@@ -170,14 +184,61 @@ def upload_project():
             title=request.form["title"],
             description=request.form["description"],
             filename=filename,
-            uploaded_by=session["user"]
+            uploaded_by=session["user"],
+            approved=False
         )
         db.session.add(project)
         db.session.commit()
 
-        return redirect("/dashboard")
+        return redirect("/admin/projects")
 
     return render_template("upload.html")
+
+# =========================
+# ADMIN — PROJECT APPROVAL
+# =========================
+@app.route("/admin/projects")
+def admin_projects():
+    if session.get("role") != "admin":
+        return "Access denied", 403
+
+    projects = Project.query.all()
+    return render_template("admin_projects.html", projects=projects)
+
+
+@app.route("/admin/approve/<int:project_id>")
+def approve_project(project_id):
+    if session.get("role") != "admin":
+        return "Access denied", 403
+
+    project = Project.query.get(project_id)
+    if project:
+        project.approved = True
+        db.session.commit()
+
+    return redirect("/admin/projects")
+
+
+@app.route("/admin/reject/<int:project_id>")
+def reject_project(project_id):
+    if session.get("role") != "admin":
+        return "Access denied", 403
+
+    project = Project.query.get(project_id)
+    if project:
+        db.session.delete(project)
+        db.session.commit()
+
+    return redirect("/admin/projects")
+
+# =========================
+# PUBLIC PROJECTS
+# =========================
+@app.route("/projects")
+def public_projects():
+    projects = Project.query.filter_by(approved=True).all()
+    return render_template("projects.html", projects=projects)
+
 
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
@@ -190,4 +251,4 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         create_default_admin()
-    app.run(debug=True)
+    app.run()
