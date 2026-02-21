@@ -1,5 +1,5 @@
 Flask
 Flask-SQLAlchemy
 Werkzeug
+Pillow
 gunicorn
-psycopg2-binary
