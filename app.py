@@ -59,7 +59,6 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def create_thumbnail(input_path, output_path, size=(300, 200)):
-    """Create thumbnail for uploaded image file."""
     try:
         with Image.open(input_path) as img:
             img.thumbnail(size)
@@ -182,6 +181,7 @@ def upload_project():
 
         # Create thumbnail if image
         thumbnail_path = None
+        thumbnail_name = None
         if filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg"}:
             thumbnail_name = f"thumb_{filename}"
             thumbnail_path = os.path.join(app.config["UPLOAD_FOLDER"], thumbnail_name)
@@ -208,6 +208,8 @@ def uploaded_file(filename):
 # -------------------------------------------------
 if __name__ == "__main__":
     with app.app_context():
+        # DROP and RECREATE tables to include the new thumbnail column
+        db.drop_all()
         db.create_all()
         create_default_admin()
     app.run(debug=True)
